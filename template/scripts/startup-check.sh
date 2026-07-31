@@ -95,11 +95,18 @@ done
 echo "----------------------------------------"
 echo "■ リマインド"
 
+# セットアップ中は「まだ達成しようがないもの」を出さない。
+# SETUP.md は導入が終わったら削除する設計なので、その有無が「導入中か」の判定になる
+# （新しい状態ファイルは作らない）。入れた初日に、先月の月次レビューが無いことや
+# 使っていない部署の未作成を並べても、直せる人がいない。
+SETTING_UP=0
+[ -f "$C/SETUP.md" ] && SETTING_UP=1
+
 # --- 2. カレンダーキャッシュ ---
 if [ -f "$C/secretary/notes/calendar-${TODAY}.md" ]; then
   echo "✅ カレンダー: 本日キャッシュ済み → notes/calendar-${TODAY}.md を読む"
-else
-  echo "⚠️ カレンダー: 未取得 → mcp-google で今日〜7日後を取得しキャッシュ保存（個人 / 共有）"
+elif [ "$SETTING_UP" -eq 0 ]; then
+  echo "⚠️ カレンダー: 未取得 → 繋いでいる場合は今日〜7日後を取得しキャッシュ保存"
 fi
 
 # --- 3. 週次圧縮（今週以外の日次ログが残っていないか） ---
@@ -119,7 +126,7 @@ fi
 # --- 4. 月次レビュー（先月分。実施されるまで毎回通知） ---
 if [ -f "$C/strategy/reviews/${PREV_MONTH}.md" ]; then
   echo "✅ 月次レビュー: ${PREV_MONTH} 実施済み"
-else
+elif [ "$SETTING_UP" -eq 0 ]; then
   echo "⚠️ 月次レビュー: ${PREV_MONTH} 分が未実施（mindset精錬含む）→「月次レビューして」"
 fi
 
@@ -140,7 +147,7 @@ if [ ! -d "$C/finance" ]; then
   echo "💡 家計月次: スキップ（finance/ はローカルのみ・ここはクラウド環境）"
 elif [ -f "$C/finance/monthly/${PREV_MONTH}.md" ]; then
   echo "✅ 家計月次: ${PREV_MONTH} 作成済み"
-else
+elif [ "$SETTING_UP" -eq 0 ]; then
   echo "⚠️ 家計月次: ${PREV_MONTH} 分が未作成 → 家計簿のCSVを用意して集計する"
 fi
 
