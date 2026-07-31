@@ -124,7 +124,8 @@ else
 fi
 
 # --- 5. mindset 精錬の鮮度（35日超で通知） ---
-last_refine=$(grep -oE '最終精錬: [0-9]{4}-[0-9]{2}-[0-9]{2}' "$C/strategy/mindset.md" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+# まだ作っていない段階でも生のエラーを出さない（雛形のままなら日付が入っていないので静かに通る）
+last_refine=$(grep -oE '最終精錬: [0-9]{4}-[0-9]{2}-[0-9]{2}' "$C/strategy/mindset.md" 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
 if [ -n "$last_refine" ]; then
   d=$(days_since "$last_refine")
   if [ -n "$d" ] && [ "$d" -gt 35 ]; then
