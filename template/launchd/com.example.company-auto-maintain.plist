@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  自動メンテナンスの発火機構（macOS / launchd）
+
+  儀式を「気が向いたらやる」にすると続かないので、時間が来たら勝手に走らせる。
+  これが無いと auto-maintain.sh はただの手動スクリプトになり、
+  「儀式に発火機構を持たせる」という設計原則（docs/design-principles.md 原則6）が
+  実演されないまま終わる。
+
+  導入:
+    1. 下の <REPLACE> を自分の環境に書き換える
+    2. cp このファイル ~/Library/LaunchAgents/
+    3. launchctl load ~/Library/LaunchAgents/com.example.company-auto-maintain.plist
+
+  確認:
+    launchctl list | grep company-auto-maintain
+    tail -f ~/Library/Logs/company-auto-maintain.log
+
+  外す:
+    launchctl unload ~/Library/LaunchAgents/com.example.company-auto-maintain.plist
+
+  注意（実運用で踏んだもの）:
+    - Label はファイル名と一致させる。ずれると unload できなくなる
+    - launchd の無人実行には、対話セッションで持っている権限の一部が引き継がれない。
+      特に macOS の TCC 権限（クラウドストレージ領域への書き込みなど）は付与できず、
+      そこへ触る処理は「無人では常に失敗し、手で動かすと成功する」という形で壊れる。
+      無人で回す処理と、対話セッション中にしかできない処理は分けること。
+      詳細は docs/limits.md を参照。
+    - 失敗しても launchd は黙っている。ログの出力先を必ず指定し、
+      「動いていなかったことに2週間気づかない」状態を避ける
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.company-auto-maintain</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <!-- <REPLACE> 自分の環境の絶対パスに書き換える -->
+        <string>/Users/YOUR_NAME/my-os/scripts/auto-maintain.sh</string>
+    </array>
+
+    <!-- ログイン時にも1回走らせる -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- 4時間ごと（14400秒）。長すぎると溜まり、短すぎるとうるさい -->
+    <key>StartInterval</key>
+    <integer>14400</integer>
+
+    <!-- 標準出力・エラーとも同じファイルへ。分けると片方しか見なくなる -->
+    <!-- <REPLACE> -->
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_NAME/Library/Logs/company-auto-maintain.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_NAME/Library/Logs/company-auto-maintain.log</string>
+</dict>
+</plist>
