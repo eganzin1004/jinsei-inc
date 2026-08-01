@@ -7,7 +7,7 @@
 # やること（判断不要な定型作業のみ）:
 #   1. カレンダーキャッシュ（今日分がなければ claude headless で取得）
 #   2. 週次圧縮（前週以前の日次ログがあれば claude headless で weekly 作成 → 検証後に日次削除）
-#   3. 使い捨てファイルの掃除（当日分以外の calendar-*/claude-updates-*。自フォルダの中だけ）
+#   3. 使い捨てファイルの掃除（当日分以外の calendar-*。自フォルダの中だけ）
 #   4. git 自動コミット（差分あり・かつ直近30分ファイル変更なし＝セッション中でないとき）
 #   5. iCloudバックアップ（git bundle を週1で作成・2世代保持。全損リスク対策の暫定保険）
 #      復元: git clone <bundleファイル> .company
@@ -155,7 +155,7 @@ for f in "$C"/secretary/notes/calendar-*.md; do
   esac
 done
 # ★このスクリプトが消してよいのは自分のフォルダの中だけ。以前ここで
-#   親ディレクトリの .playwright-mcp/ を rm -rf していたが、自分の管理外を
+#   親ディレクトリにある別ツールの作業フォルダを rm -rf していたが、自分の管理外を
 #   確認なく消す処理だった（別ツールが同じ場所を使っていると巻き込む）。
 #   使い捨てスクショの掃除は、それを作ったツール側の責任として切り離した。
 [ "$cleaned" -gt 0 ] && actions="$actions cleanup:OK(${cleaned}件)"
