@@ -3,7 +3,6 @@
 # 人生OS 起動チェックスクリプト
 # /company 起動時に 秘書役 が最初に実行する。チェックの判定ロジックの正はこのファイル。
 # 出力の見方: ✅=OK / 💡=軽い案内 / ⚠️=要対応 / 🔥=期限超過 / 🎯=マイルストーン / ❓=今月の問い
-# 💬 REMARK は 秘書役 への内部シグナル（ダッシュボードには転記しない）。
 # BSD date（macOS）/ GNU date（クラウドVM）両対応。パスはスクリプト位置から導出。
 # =====================================================================
 
@@ -228,106 +227,6 @@ if [ "${changes:-0}" -gt 0 ]; then
   d=""
   [ -n "$last_commit" ] && d=$(days_since "$last_commit")
   echo "💡 git: 未コミット ${changes} 件（最終コミット ${last_commit:-なし}・${d:-?}日前）→ 週次圧縮時にまとめて commit"
-fi
-
-# --- 11. 💬 REMARK（秘書役への内部シグナル・1日1件・クールダウン3日） ---
-# 「言うことがある日」の検出だけを機械層で行う。発火した日だけ 秘書役 が素材を読んで地の文で書く。
-# 出力行はダッシュボードに転記しない（行末に明示）。イベント優先: E3 > E2 > E4 > E1。
-if [ "$(uname)" = "Darwin" ]; then
-  STATE_DIR="$HOME/Library/Application Support/company-auto-maintain"
-  REMARK_STATE="$STATE_DIR/last-remark-date"
-  STARTUP_STATE="$STATE_DIR/last-startup-date"
-
-  # 前回起動からの経過（E2判定用。状態ファイルの更新はこの節の最後）
-  startup_gap=""
-  if [ -f "$STARTUP_STATE" ]; then
-    last_startup=$(head -1 "$STARTUP_STATE" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
-    [ -n "$last_startup" ] && startup_gap=$(days_since "$last_startup")
-  fi
-
-  # 共通ゲート: 前回の発火から3日未満なら全イベント不発（定型化を防ぐ主装置）
-  remark_ok=1
-  if [ -f "$REMARK_STATE" ]; then
-    last_remark=$(head -1 "$REMARK_STATE" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}')
-    if [ -n "$last_remark" ]; then
-      rk_d=$(days_since "$last_remark")
-      [ -n "$rk_d" ] && [ "$rk_d" -lt 3 ] && remark_ok=0
-    fi
-  fi
-
-  remark_line=""
-
-  # 優先1: E3 過去の同日（1ヶ月前→3ヶ月前 / growth-log→ideas→mindset-log・週次フォールバックなし）
-  if [ "$remark_ok" -eq 1 ]; then
-    for back in 1 3; do
-      [ -n "$remark_line" ] && break
-      if [ "$IS_BSD" -eq 1 ]; then
-        pd=$(date -v-"${back}"m +%Y-%m-%d)
-      else
-        pd=$(date -d "-${back} month" +%Y-%m-%d)
-      fi
-      [ -n "$pd" ] || continue
-      span="${back}ヶ月前"
-      gl="$C/life/mental/growth-log.md"
-      hit=""
-      [ -f "$gl" ] && hit=$(grep -m1 "^### ${pd}" "$gl" | sed 's/^### //')
-      if [ -n "$hit" ]; then
-        remark_line="E3 | 素材: life/mental/growth-log.md（${span} ${hit}）"
-        continue
-      fi
-      idf="$C/secretary/ideas/${pd}.md"
-      if [ -f "$idf" ]; then
-        hit=$(grep -m1 '^## ' "$idf" | sed 's/^## //')
-        remark_line="E3 | 素材: secretary/ideas/${pd}.md（${span} ${hit:-アイデアメモ}）"
-        continue
-      fi
-      hit=$(grep -m1 "^## ${pd}" "$C/strategy/mindset-log.md" 2>/dev/null | sed 's/^## //')
-      [ -n "$hit" ] && remark_line="E3 | 素材: strategy/mindset-log.md（${span} ${hit}）"
-    done
-  fi
-
-  # 優先2: E2 間が空いた（前回の起動から7日以上）
-  if [ "$remark_ok" -eq 1 ] && [ -z "$remark_line" ] && [ -n "$startup_gap" ] && [ "$startup_gap" -ge 7 ]; then
-    lw=$(ls "$C/secretary/notes/weekly"/*.md 2>/dev/null | tail -1)
-    [ -n "$lw" ] && remark_line="E2 | 素材: secretary/notes/weekly/$(basename "$lw")（前回起動から${startup_gap}日）"
-  fi
-
-  # 優先3: E4 決定が溜まった（直近7日の decisions.md 新規###が3件以上）
-  if [ "$remark_ok" -eq 1 ] && [ -z "$remark_line" ] && [ -f "$C/secretary/notes/decisions.md" ]; then
-    recent_days=""
-    i=0
-    while [ "$i" -lt 7 ]; do
-      if [ "$IS_BSD" -eq 1 ]; then rday=$(date -v-"${i}"d +%Y-%m-%d); else rday=$(date -d "-${i} day" +%Y-%m-%d); fi
-      recent_days="$recent_days $rday"
-      i=$((i + 1))
-    done
-    dec_n=$(awk -v days=" ${recent_days} " '
-      /^## / { if ($2 ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]$/) sec = $2; next }
-      /^### / { if (sec != "" && index(days, " " sec " ") > 0) n++ }
-      END { print n + 0 }' "$C/secretary/notes/decisions.md")
-    if [ -n "$dec_n" ] && [ "$dec_n" -ge 3 ]; then
-      remark_line="E4 | 素材: secretary/notes/decisions.md（直近7日の新規###が${dec_n}件）"
-    fi
-  fi
-
-  # 優先4: E1 思考が動いた（mindset-log の mtime が2日以内）
-  if [ "$remark_ok" -eq 1 ] && [ -z "$remark_line" ] && [ -f "$C/strategy/mindset-log.md" ]; then
-    if [ "$IS_BSD" -eq 1 ]; then
-      ml_epoch=$(stat -f %m "$C/strategy/mindset-log.md" 2>/dev/null)
-    else
-      ml_epoch=$(stat -c %Y "$C/strategy/mindset-log.md" 2>/dev/null)
-    fi
-    if [ -n "$ml_epoch" ] && [ $(( (NOW_EPOCH - ml_epoch) / 86400 )) -le 2 ]; then
-      remark_line="E1 | 素材: strategy/mindset-log.md（末尾3エントリ）"
-    fi
-  fi
-
-  mkdir -p "$STATE_DIR"
-  if [ -n "$remark_line" ]; then
-    echo "💬 REMARK: ${remark_line} ※秘書役への内部指示・ダッシュボードに転記しない"
-    echo "$TODAY" > "$REMARK_STATE"
-  fi
-  echo "$TODAY" > "$STARTUP_STATE"
 fi
 
 echo "----------------------------------------"
